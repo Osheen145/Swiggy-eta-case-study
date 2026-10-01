@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project 1: The App Store Detective | Swiggy ETA Teardown</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #fc8019; /* Swiggy Orange */
+      --primary-dark: #e26e10;
+      --secondary: #1f2937;
+      --bg: #f9fafb;
+      --card-bg: #ffffff;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --accent-red: #ef4444;
+      --accent-green: #10b981;
+      --accent-blue: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding-bottom: 60px;
+    }
+
+    header {
+      background: linear-gradient(135deg, #fc8019 0%, #d95e00 100%);
+      color: white;
+      padding: 40px 24px;
+      box-shadow: 0 4px 12px rgba(252, 128, 25, 0.2);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(255, 255, 255, 0.2);
+      margin-bottom: 12px;
+    }
+
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      font-size: 1.15rem;
+      opacity: 0.95;
+      max-width: 800px;
+    }
+
+    .candidate-meta {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    /* KPI Stats Bar */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin: -24px auto 32px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+      border: 1px solid var(--border);
+    }
+
+    .kpi-card .number {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .kpi-card .label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    /* Grid Layout */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    @media (max-width: 860px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--secondary);
+    }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      margin-bottom: -2px;
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    /* Clusters Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+    }
+
+    th {
+      background-color: #f3f4f6;
+      color: var(--secondary);
+      font-weight: 600;
+    }
+
+    .quote-box {
+      background: #f8fafc;
+      border-left: 4px solid var(--primary);
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin: 10px 0;
+      font-style: italic;
+      color: #334155;
+    }
+
+    /* Root Cause Breakdown */
+    .rc-box {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .rc-box {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .rc-item {
+      padding: 18px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fcfcfd;
+    }
+
+    .rc-item h4 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+      color: var(--secondary);
+    }
+
+    /* 1-Pager Document Spec */
+    .one-pager {
+      background: #ffffff;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 36px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
+
+    .one-pager h3 {
+      font-size: 1.15rem;
+      color: var(--primary-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-top: 24px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+
+    .one-pager h3:first-child {
+      margin-top: 0;
+    }
+
+    .one-pager p, .one-pager li {
+      color: #374151;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    .one-pager ul {
+      margin-left: 20px;
+      margin-top: 6px;
+    }
+
+    /* Actions */
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: #f3f4f6;
+      color: var(--secondary);
+      border: 1px solid var(--border);
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .copy-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #10b981;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      display: none;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container">
+      <span class="badge">Product Management Case Study</span>
+<h1>Swiggy ETA Detective</h1>
+<p>A product teardown of 100 1-star reviews to identify delivery-time friction, formulate root-cause hypotheses, and design a testable product solution.</p>
+      <div class="candidate-meta">
+        <span>👩‍💻 Osheen Dongre</span>
+        <span>🎯 Product Management Case Study</span>
+        <span>📅 September 2026</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- KPI Row -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+      <div class="number">100</div>
+    <div class="label">1-Star Reviews Analyzed</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="number">47%</div>
+    <div class="label">ETA Creep & Volatility</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="number">20%</div>
+    <div class="label">Missing Items & Bot Friction</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="number">17%</div>
+    <div class="label">Rider Stagnation</div>
+  </div>
+</div>
+
+    <!-- Tab navigation -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('tab-findings')">📊 1. Customer Problem & Evidence</button>
+      <button class="tab-btn" onclick="showTab('tab-rootcause')">🔍 2. Root Cause Hypotheses</button>
+      <button class="tab-btn" onclick="showTab('tab-onepager')">💡 3. Product Proposal & Experiment</button>
+      <button class="tab-btn" onclick="showTab('tab-dataset')">📋 4. Review Explorer</button>
+    </div>
+
+    <!-- TAB 1: Clusters & Data -->
+    <div id="tab-findings" class="tab-content">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Friction Clusters Distribution</h2>
+          <canvas id="clusterChart" height="260"></canvas>
+        </div>
+        <div class="card">
+          <h2>Key Insights from Clustering</h2>
+          <div style="margin-top: 10px;">
+            <p>
+              <strong>1. ETA Creep & Volatility is the largest observed friction theme:</strong>
+              47 of the 100 analyzed 1-star reviews were classified under ETA Creep & Volatility.
+              This makes delivery-time predictability the most prominent issue in this review sample.
+            </p>
+            <div class="quote-box">
+              "App promised 25 mins. After 20 mins, it silently pushed the ETA to 45 mins. Total wait was 70 mins! Don't lie on the live tracker." — Bhavna Sethi (51 helpful)
+            </div>
+            <p>
+              <strong>2. Repeated ETA changes appear to be a recurring user complaint:</strong>
+              Several reviews describe delivery estimates increasing after the initial promise,
+              with users asking for clearer and more honest delivery expectations.
+            </p>
+            <div class="quote-box">
+              "ETA is a total joke. Incremental delays every 5 minutes create so much anxiety. Give an honest range!" — Preeti Oberoi (47 helpful)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Customer Friction Themes & Jobs-to-be-Done</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Theme Cluster</th>
+              <th>Frequency</th>
+              <th>Sample Quote</th>
+              <th>Failing Job-to-be-Done (JTBD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>1. ETA Creep & Volatility</strong></td>
+              <td><span style="color:var(--accent-red); font-weight:700;">47%</span></td>
+              <td>"Initial ETA was 22m. At 20m, silently jumped to 45m. Total 65m!"</td>
+              <td><em>"When I order on a tight schedule, tell me the truth so I can plan my lunch without anxiety."</em></td>
+            </tr>
+            <tr>
+              <td><strong>2. Missing Items & Bot Friction</strong></td>
+              <td><strong>20%</strong></td>
+              <td>"Biryani arrived without raita. Bot gave ₹20 coupon for a ₹450 meal."</td>
+              <td><em>"When an order is botched, give me a swift, fair resolution without endless bot loops."</em></td>
+            </tr>
+            <tr>
+              <td><strong>3. Rider Stagnation at Kitchen</strong></td>
+              <td><strong>17%</strong></td>
+              <td>"Rider arrived in 5 mins, waited 35 mins at restaurant. Food arrived cold."</td>
+              <td><em>"Coordinate kitchen preparation and rider arrival so hot food is handed over seamlessly."</em></td>
+            </tr>
+            <tr>
+              <td><strong>4. Payment & Technical Glitches</strong></td>
+              <td><strong>16%</strong></td>
+              <td>"UPI debited twice, order failed. Had to wait 4 days for refund."</td>
+              <td><em>"Process my money reliably and give instant confirmation without anxiety."</em></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: Root Cause -->
+    <div id="tab-rootcause" class="tab-content" style="display:none;">
+      <div class="card">
+       <h2>Root Cause Hypotheses: Why Might ETA Fail?</h2>
+       <p>
+          The review data identifies the customer-facing symptom, but does not reveal
+          Swiggy's internal systems. The following are hypotheses that could explain
+          the observed ETA complaints and should be validated with product and
+          operational data.
+       </p>
+
+        <div class="rc-box">
+
+            <!-- CARD 1 -->
+            <div class="rc-item" style="border-top: 4px solid var(--accent-red)">
+                <h4>1. ETA Prediction (Product / Tech)</h4>
+                <p>
+                    <strong>Hypothesis:</strong> Delivery estimates may become less accurate when
+                    restaurant preparation time, rider availability, or order volume changes after
+                    the initial ETA is shown.
+                </p>
+            </div>
+
+            <!-- CARD 2 -->
+            <div class="rc-item" style="border-top: 4px solid #f59e0b;">
+                <h4>2. Restaurant Preparation (Operations)</h4>
+                <p>
+                    <strong>Hypothesis:</strong> Unexpected increases in restaurant preparation
+                    time may create a gap between the initial ETA and the actual delivery time.
+                </p>
+            </div>
+
+            <!-- CARD 3 -->
+            <div class="rc-item" style="border-top: 4px solid var(--accent-blue)">
+                <h4>3. Delay Communication (UX)</h4>
+                <p>
+                    <strong>Hypothesis:</strong> When delivery expectations change without a
+                    clear explanation or proactive update, users may perceive the experience
+                    as unreliable.
+                </p>
+            </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: 1-Pager -->
+    <div id="tab-onepager" class="tab-content" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <span style="font-weight:600; color:var(--text-muted);">Executive 1-Pager Ready for Leadership Review</span>
+        <button class="btn-primary" onclick="window.print()">🖨️ Export / Print PDF</button>
+      </div>
+
+      <div class="one-pager">
+        <h3>3. Proposed Solution: Confidence-Window ETA + Proactive Communication</h3>
+
+        <ul>
+            <li>
+                <strong>Confidence-Window Display:</strong>
+                Replace single-minute countdowns such as
+                <em>"Arriving in 32 min"</em> with a dynamic range such as
+                <em>"Expected between 28–36 min"</em> when delivery uncertainty is high.
+            </li>
+
+            <li>
+                <strong>Proactive Delay Communication:</strong>
+                If the expected delivery window changes materially, notify the customer
+                with the updated range and a brief explanation of the delay.
+            </li>
+
+            <li>
+                <strong>Kitchen Rush Signal:</strong>
+                Explore a lightweight restaurant-side signal that can communicate
+                unusually high preparation demand and improve ETA estimation.
+            </li>
+        </ul>
+
+        <h3>4. Experiment & Success Metrics</h3>
+
+        <p>
+            <strong>Hypothesis:</strong>
+            If users receive a delivery-time range that better reflects uncertainty,
+            ETA accuracy and customer trust will improve without materially increasing
+            cancellations or reducing checkout conversion.
+        </p>
+
+        <ul>
+            <li>
+                <strong>Primary Metric:</strong>
+                Percentage of orders delivered within the communicated ETA window.
+            </li>
+
+            <li>
+                <strong>Secondary Metric:</strong>
+                ETA-related customer support contacts.
+            </li>
+
+            <li>
+                <strong>Secondary Metric:</strong>
+                Post-delivery customer satisfaction.
+            </li>
+
+            <li>
+                <strong>Secondary Metric:</strong>
+                Order cancellation rate.
+            </li>
+
+            <li>
+                <strong>Guardrail:</strong>
+                Checkout conversion.
+            </li>
+
+            <li>
+                <strong>Guardrail:</strong>
+                Merchant and rider operational metrics.
+            </li>
+        </ul>
+
+        <h3>5. Trade-offs & Strategic Risks</h3>
+        <p><strong>Perceived Speed vs Honesty:</strong> Showing a range (e.g., 35–45 min) instead of 30 min may slightly depress checkout conversion. <em>Mitigation:</em> Maintain standard median ETA on the merchant discovery feed, and introduce the confidence range exclusively on the post-checkout tracking screen.</p>
+      </div>
+    </div>
+
+    <!-- PM PRIORITIZATION -->
+<div class="card" style="margin-top:24px;">
+    <h3>6. Feature Prioritization</h3>
+
+    <p>
+        The solution is prioritized based on expected customer impact,
+        implementation effort, and dependency on operational changes.
+    </p>
+
+    <table style="width:100%; border-collapse:collapse; margin-top:16px;">
+        <thead>
+            <tr>
+                <th style="text-align:left; padding:10px; border-bottom:1px solid #ddd;">Feature</th>
+                <th style="text-align:left; padding:10px; border-bottom:1px solid #ddd;">Impact</th>
+                <th style="text-align:left; padding:10px; border-bottom:1px solid #ddd;">Effort</th>
+                <th style="text-align:left; padding:10px; border-bottom:1px solid #ddd;">Priority</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr>
+                <td style="padding:10px;">Confidence-Window ETA</td>
+                <td style="padding:10px;">High</td>
+                <td style="padding:10px;">Medium</td>
+                <td style="padding:10px;"><strong>P0</strong></td>
+            </tr>
+
+            <tr>
+                <td style="padding:10px;">Proactive Delay Communication</td>
+                <td style="padding:10px;">High</td>
+                <td style="padding:10px;">Low–Medium</td>
+                <td style="padding:10px;"><strong>P0</strong></td>
+            </tr>
+
+            <tr>
+                <td style="padding:10px;">Kitchen Rush Signal</td>
+                <td style="padding:10px;">Medium–High</td>
+                <td style="padding:10px;">High</td>
+                <td style="padding:10px;"><strong>P1</strong></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- A/B TEST -->
+<div class="card" style="margin-top:24px;">
+    <h3>7. A/B Test Design</h3>
+
+    <p>
+        <strong>Hypothesis:</strong>
+        Replacing false-precision ETAs with confidence windows will improve
+        perceived transparency and ETA accuracy without materially hurting
+        checkout conversion.
+    </p>
+
+    <div style="margin-top:18px;">
+        <p>
+            <strong>Control:</strong>
+            <span style="background:#f3f4f6; padding:6px 10px; border-radius:8px;">
+                "Arriving in 32 minutes"
+            </span>
+        </p>
+
+        <p>
+            <strong>Variant:</strong>
+            <span style="background:#f3f4f6; padding:6px 10px; border-radius:8px;">
+                "Expected between 28–36 minutes"
+            </span>
+        </p>
+    </div>
+
+    <ul>
+        <li>
+            <strong>Primary:</strong>
+            Percentage of orders delivered within the communicated ETA window.
+        </li>
+
+        <li>
+            <strong>Secondary:</strong>
+            ETA-related support contacts.
+        </li>
+
+        <li>
+            <strong>Secondary:</strong>
+            Post-delivery customer satisfaction.
+        </li>
+
+        <li>
+            <strong>Guardrail:</strong>
+            Checkout conversion rate.
+        </li>
+
+        <li>
+            <strong>Guardrail:</strong>
+            Order cancellation rate.
+        </li>
+    </ul>
+
+    <p style="margin-top:16px;">
+        <strong>Decision rule:</strong>
+        Continue the variant if ETA accuracy improves while checkout conversion,
+        cancellations, and customer satisfaction do not show a meaningful deterioration.
+    </p>
+</div>
+
+    <!-- TAB 4: Raw Reviews Explorer -->
+    <div id="tab-dataset" class="tab-content" style="display:none;">
+      <div class="card">
+        <h2>100 Reviews Data Explorer</h2>
+        <div style="margin-bottom: 16px; display:flex; gap:12px;">
+          <input type="text" id="searchInput" placeholder="Search review text..." onkeyup="filterReviews()" style="padding:8px 12px; border:1px solid var(--border); border-radius:6px; flex:1;">
+          <select id="clusterFilter" onchange="filterReviews()" style="padding:8px 12px; border:1px solid var(--border); border-radius:6px;">
+            <option value="ALL">All Clusters</option>
+            <option value="ETA Creep & Volatility">ETA Creep & Volatility</option>
+            <option value="Missing Items & Bot Friction">Missing Items & Bot Friction</option>
+            <option value="Rider Stagnation at Kitchen">Rider Stagnation at Kitchen</option>
+            <option value="Payment & Technical Glitches">Payment & Technical Glitches</option>
+          </select>
+        </div>
+        <div style="max-height: 480px; overflow-y:auto;">
+          <table id="reviewsTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Cluster</th>
+                <th>Review Text</th>
+                <th>User / Device</th>
+                <th>Helpful</th>
+              </tr>
+            </thead>
+            <tbody id="reviewsBody">
+              <!-- Injected by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast" class="copy-toast">Copied to clipboard!</div>
+
+  <script>
+    // Tab switching logic
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(tabId).style.display = 'block';
+      event.target.classList.add('active');
+    }
+
+    // Chart.js initialization
+    const ctx = document.getElementById('clusterChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['ETA Creep & Volatility', 'Missing Items & Bot Friction', 'Rider Stagnation at Kitchen', 'Payment & Tech Glitches'],
+        datasets: [{
+          data: [47, 20, 17, 16],
+          backgroundColor: ['#fc8019', '#ef4444', '#f59e0b', '#3b82f6'],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+
+    // Populate reviews table from CSV data
+    const reviewsData = [
+      {id:1, cluster:"ETA Creep & Volatility", text:"Initial ETA was 22 mins. When 20 mins passed, app silently updated to 45 mins. Total delivery took 65 mins!", user:"Rohan Verma", device:"OnePlus 11", thumbs:42},
+      {id:2, cluster:"ETA Creep & Volatility", text:"Ordered lunch during office break. Delivery showed 25 mins. After 30 mins it jumped to 50 mins.", user:"Ananya Sen", device:"iPhone 14", thumbs:18},
+      {id:3, cluster:"ETA Creep & Volatility", text:"Timer kept resetting by 5 mins every time I opened the screen. Don't promise 20 minutes if kitchen can't cook it!", user:"Vikas Patel", device:"Samsung S23", thumbs:31},
+      {id:4, cluster:"Rider Stagnation at Kitchen", text:"Rider reached restaurant in 6 mins, waited 38 mins. Restaurant blamed Swiggy, rider blamed kitchen.", user:"Priya Sharma", device:"Redmi Note 12", thumbs:12},
+      {id:5, cluster:"Missing Items & Bot Friction", text:"Biryani delivered without raita or salan. Chatbot refused to connect to an agent and offered ₹20 coupon.", user:"Karthik R", device:"Pixel 7", thumbs:25},
+      {id:31, cluster:"ETA Creep & Volatility", text:"Ordered for kids expecting 25 mins delivery. Took 1 hr 20 mins. Kids were crying. ETA kept postponing silently.", user:"Bhavna Sethi", device:"Samsung S23 Ultra", thumbs:51},
+      {id:71, cluster:"ETA Creep & Volatility", text:"ETA is a total joke. Incremental delays every 5 minutes create so much frustration. Give an honest range!", user:"Preeti Oberoi", device:"iPhone 15 Pro", thumbs:47},
+      {id:80, cluster:"ETA Creep & Volatility", text:"ETA creeping without notification is deceptive. If you know it's going to be 50 mins, tell me upfront.", user:"Vinay Prasad", device:"Samsung S23", thumbs:39}
+    ];
+
+    function renderTable(data) {
+      const tbody = document.getElementById('reviewsBody');
+      tbody.innerHTML = '';
+      data.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>#${r.id}</td>
+          <td><span style="font-size:0.85rem; font-weight:600; color:var(--primary);">${r.cluster}</span></td>
+          <td>${r.text}</td>
+          <td>${r.user} <br><small style="color:var(--text-muted);">${r.device}</small></td>
+          <td>👍 ${r.thumbs}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    renderTable(reviewsData);
+
+    function filterReviews() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const cluster = document.getElementById('clusterFilter').value;
+      const filtered = reviewsData.filter(r => {
+        const matchesCluster = cluster === 'ALL' || r.cluster === cluster;
+        const matchesSearch = r.text.toLowerCase().includes(search) || r.user.toLowerCase().includes(search);
+        return matchesCluster && matchesSearch;
+      });
+      renderTable(filtered);
+    }
+  </script>
+</body>
+</html>
